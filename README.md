@@ -1,51 +1,54 @@
 # LDAP Hex Dump Decoder
 
-Java の `-Djavax.net.debug=ssl,record,plaintext` 出力に含まれる、復号後の
-plaintext hex ダンプ部分（`Plaintext before ENCRYPTION (` / `Plaintext after
-DECRYPTION (` に続くブロック）を貼り付けると、
-[pyasn1_ldap](https://github.com/hokuda/pyasn1_ldap) を使って LDAP メッセージ
-としてデコードし、人が読める形式（`prettyPrint()` のツリー表示）で表示します。
+Paste the decrypted plaintext hex dump section from the output of Java's
+`-Djavax.net.debug=ssl,record,plaintext` (the block following
+`Plaintext before ENCRYPTION (` / `Plaintext after DECRYPTION (`), and it
+decodes it as an LDAP message using
+[pyasn1_ldap](https://github.com/hokuda/pyasn1_ldap), displaying it in a
+human-readable format (`prettyPrint()` tree view).
 
-すべての処理は [Pyodide](https://pyodide.org/)（WebAssembly 上で動く
-CPython）でブラウザ内で完結します。サーバー側の処理は一切なく、GitHub Pages
-のような静的ホスティングだけで動作します。
+All processing runs entirely in the browser via
+[Pyodide](https://pyodide.org/) (CPython running on WebAssembly). There is
+no server-side processing at all, so it works with static hosting such as
+GitHub Pages.
 
-## 使い方
+## Usage
 
-1. Java 側のログから hex ダンプ部分（オフセット・16進バイト列・ASCII サイド
-   バーの行）だけをコピーします。前後の `Plaintext before ENCRYPTION (` /
-   `)` の行が混ざっていても問題ありません。
-2. テキストエリアに貼り付けて「Decode」ボタンを押します。
-3. 1つの貼り付けに複数の LDAPMessage が連結して含まれている場合は、
-   それぞれ "Message 1", "Message 2", ... として表示されます。
+1. Copy just the hex dump section (the lines with offset, hex bytes, and
+   ASCII sidebar) from the Java-side log. It's fine if the surrounding
+   `Plaintext before ENCRYPTION (` / `)` lines are included too.
+2. Paste it into the text area and click the "Decode" button.
+3. If a single paste contains multiple concatenated LDAPMessages, each one
+   is displayed separately as "Message 1", "Message 2", etc.
 
-## ローカルでの動作確認
+## Verifying it works locally
 
-`file://` で `index.html` を直接開くと `fetch()` / `loadPyodide()` が失敗する
-ため、簡易 HTTP サーバー経由で開いてください。
+Opening `index.html` directly via `file://` will cause `fetch()` /
+`loadPyodide()` to fail, so serve it via a simple HTTP server instead.
 
 ```sh
 python3 -m http.server 8000
 ```
 
-ブラウザで `http://localhost:8000/` を開き、ステータス表示が
-「Loading Python runtime…」→「Loading micropip…」→
-「Installing pyasn1_ldap from PyPI…」→「Ready.」と進み、Decode ボタンが
-有効になることを確認します。
+Open `http://localhost:8000/` in a browser. The status display should
+progress through "Loading Python runtime…" → "Loading micropip…" →
+"Installing pyasn1_ldap from PyPI…" → "Ready.", after which the Decode
+button becomes enabled.
 
-## GitHub Pages へのデプロイ
+## Deploying to GitHub Pages
 
-このリポジトリはビルド不要の静的ファイルのみで構成されています。
+This repository consists only of static files that require no build step.
 
-1. `main` ブランチに push する。
-2. リポジトリの Settings → Pages → Source を
-   "Deploy from a branch" / Branch: `main` / `(root)` に設定する。
-3. 発行された URL でページが開けることを確認する。
+1. Push to the `main` branch.
+2. In the repository's Settings → Pages → Source, set
+   "Deploy from a branch" / Branch: `main` / `(root)`.
+3. Confirm the page opens at the published URL.
 
-## 制限事項
+## Limitations
 
-- `pyasn1_ldap` は PyPI 上の単一リリース（0.1.0）の小規模なパッケージです。
-  実行時に PyPI から直接取得するため、PyPI への接続がブロックされている環境
-  （社内プロキシ等）では動作しません。
-- 初回ロードは Pyodide 本体と依存パッケージのダウンロードのため数秒〜十数秒
-  かかります。
+- `pyasn1_ldap` is a small package published as a single release (0.1.0)
+  on PyPI. Since it's fetched directly from PyPI at runtime, it won't work
+  in environments where access to PyPI is blocked (e.g. behind a corporate
+  proxy).
+- The initial load takes a few to several tens of seconds, since it
+  downloads Pyodide itself along with its dependent packages.

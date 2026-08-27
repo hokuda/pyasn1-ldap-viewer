@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,10 +10,11 @@
 <main>
   <h1>LDAP Hex Dump Decoder</h1>
   <p class="lead">
-    Java の <code>-Djavax.net.debug=ssl,record,plaintext</code> 出力から得られる
-    hex ダンプ部分を貼り付けると、
-    <a href="https://github.com/hokuda/pyasn1_ldap" target="_blank" rel="noopener">pyasn1_ldap</a>
-    を使って LDAP メッセージとしてデコードし、人が読める形式で表示します。
+    Paste the hex dump section from the output of Java's
+    <code>-Djavax.net.debug=ssl,record,plaintext</code>, and it decodes it
+    as an LDAP message using
+    <a href="https://github.com/hokuda/pyasn1_ldap" target="_blank" rel="noopener">pyasn1_ldap</a>,
+    displaying it in a human-readable format.
   </p>
 
   <textarea id="input" rows="14" spellcheck="false"
