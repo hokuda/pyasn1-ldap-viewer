@@ -9,6 +9,14 @@ OFFSET_RE = re.compile(r"^[0-9A-Fa-f]{4,8}:?$")
 BYTE_RE = re.compile(r"^[0-9A-Fa-f]{2}$")
 MAX_BYTES_PER_LINE = 16
 DIAGNOSTIC_MESSAGE_RE = re.compile(r"(diagnosticMessage=)0x([0-9A-Fa-f]+)")
+FILTER_LINE_RE = re.compile(r"^(?P<indent> *)filter=")
+
+FILTER_COMPARISON_OPS = {
+    "equalityMatch": "=",
+    "greaterOrEqual": ">=",
+    "lessOrEqual": "<=",
+    "approxMatch": "~=",
+}
 
 
 def extract_hex_bytes(text: str) -> bytes:
@@ -50,6 +58,101 @@ def render_diagnostic_message_as_string(pretty: str) -> str:
     return DIAGNOSTIC_MESSAGE_RE.sub(repl, pretty)
 
 
+def escape_filter_value(value: bytes) -> str:
+    """Render an assertion value per RFC 4515: printable text as-is, with
+    '*', '(', ')', '\\' and NUL backslash-hex-escaped; genuinely binary
+    values are escaped byte-by-byte."""
+    try:
+        text = value.decode("utf-8")
+    except UnicodeDecodeError:
+        return "".join("\\%02x" % b for b in value)
+    out = []
+    for ch in text:
+        if ch in ("*", "(", ")", "\\"):
+            out.append("\\%02x" % ord(ch))
+        elif ch == "\x00":
+            out.append("\\00")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def render_filter(filt) -> str:
+    """Render a decoded rfc4511.Filter as an RFC 4515 filter string, e.g.
+    (&(ou=Marketing)(!(description=*X.500*)))."""
+    name = filt.getName()
+    component = filt.getComponent()
+
+    if name in ("and", "or"):
+        op = "&" if name == "and" else "|"
+        inner = "".join(render_filter(sub) for sub in component)
+        return f"({op}{inner})"
+
+    if name == "not":
+        return f"(!{render_filter(component)})"
+
+    if name in FILTER_COMPARISON_OPS:
+        attr = str(component["attributeDesc"])
+        value = escape_filter_value(bytes(component["assertionValue"]))
+        return f"({attr}{FILTER_COMPARISON_OPS[name]}{value})"
+
+    if name == "substrings":
+        attr = str(component["type"])
+        initial = None
+        final = None
+        middles = []
+        for choice in component["substrings"]:
+            value = escape_filter_value(bytes(choice.getComponent()))
+            choice_name = choice.getName()
+            if choice_name == "initial":
+                initial = value
+            elif choice_name == "final":
+                final = value
+            else:
+                middles.append(value)
+        pieces = [initial or ""] + middles + [final or ""]
+        return f"({attr}={'*'.join(pieces)})"
+
+    if name == "present":
+        return f"({str(component)}=*)"
+
+    if name == "extensibleMatch":
+        attr = str(component["type"]) if component["type"].isValue else ""
+        rule = str(component["matchingRule"]) if component["matchingRule"].isValue else ""
+        dn = ":dn" if bool(component["dnAttributes"]) else ""
+        rule_part = f":{rule}" if rule else ""
+        value = escape_filter_value(bytes(component["matchValue"]))
+        return f"({attr}{dn}{rule_part}:={value})"
+
+    return f"(unsupported-filter-type:{name})"
+
+
+def render_search_filter_as_string(pretty: str, filter_str: str) -> str:
+    """Replace the (potentially deeply nested, multi-line) default
+    prettyPrint() rendering of the 'filter=' field with a single-line
+    ldapsearch-style filter string."""
+    lines = pretty.split("\n")
+    out = []
+    i = 0
+    while i < len(lines):
+        match = FILTER_LINE_RE.match(lines[i])
+        if not match:
+            out.append(lines[i])
+            i += 1
+            continue
+
+        indent = match.group("indent")
+        out.append(f"{indent}filter={filter_str}")
+        i += 1
+        while i < len(lines):
+            rest_indent = len(lines[i]) - len(lines[i].lstrip(" "))
+            if lines[i].strip() == "" or rest_indent > len(indent):
+                i += 1
+                continue
+            break
+    return "\n".join(out)
+
+
 def decode_ldap_messages(data: bytes) -> dict:
     """Repeatedly BER-decode LDAPMessage PDUs, since a pasted dump may
     contain more than one concatenated message."""
@@ -62,7 +165,15 @@ def decode_ldap_messages(data: bytes) -> dict:
         except PyAsn1Error as exc:
             error = f"BER decode error after {len(messages)} message(s): {exc}"
             break
-        messages.append(render_diagnostic_message_as_string(msg.prettyPrint()))
+        pretty = render_diagnostic_message_as_string(msg.prettyPrint())
+        protocol_op = msg["protocolOp"]
+        if protocol_op.getName() == "searchRequest":
+            try:
+                filter_str = render_filter(protocol_op["searchRequest"]["filter"])
+                pretty = render_search_filter_as_string(pretty, filter_str)
+            except Exception:
+                pass
+        messages.append(pretty)
     return {
         "messages": messages,
         "count": len(messages),
