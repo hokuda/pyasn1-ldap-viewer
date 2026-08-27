@@ -8,6 +8,7 @@ from pyasn1_ldap import rfc4511
 OFFSET_RE = re.compile(r"^[0-9A-Fa-f]{4,8}:?$")
 BYTE_RE = re.compile(r"^[0-9A-Fa-f]{2}$")
 MAX_BYTES_PER_LINE = 16
+DIAGNOSTIC_MESSAGE_RE = re.compile(r"(diagnosticMessage=)0x([0-9A-Fa-f]+)")
 
 
 def extract_hex_bytes(text: str) -> bytes:
@@ -32,6 +33,23 @@ def extract_hex_bytes(text: str) -> bytes:
     return bytes(out)
 
 
+def render_diagnostic_message_as_string(pretty: str) -> str:
+    """pyasn1's default OctetString.prettyPrint() falls back to a hex dump
+    whenever a byte is outside the printable ASCII range, which hides
+    otherwise-readable diagnosticMessage text (e.g. non-ASCII characters).
+    Redecode it as UTF-8 and show the string when possible."""
+
+    def repl(match: re.Match) -> str:
+        prefix, hex_bytes = match.groups()
+        try:
+            decoded = bytes.fromhex(hex_bytes).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return match.group(0)
+        return prefix + decoded
+
+    return DIAGNOSTIC_MESSAGE_RE.sub(repl, pretty)
+
+
 def decode_ldap_messages(data: bytes) -> dict:
     """Repeatedly BER-decode LDAPMessage PDUs, since a pasted dump may
     contain more than one concatenated message."""
@@ -44,7 +62,7 @@ def decode_ldap_messages(data: bytes) -> dict:
         except PyAsn1Error as exc:
             error = f"BER decode error after {len(messages)} message(s): {exc}"
             break
-        messages.append(msg.prettyPrint())
+        messages.append(render_diagnostic_message_as_string(msg.prettyPrint()))
     return {
         "messages": messages,
         "count": len(messages),
