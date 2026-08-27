@@ -10,6 +10,7 @@ BYTE_RE = re.compile(r"^[0-9A-Fa-f]{2}$")
 MAX_BYTES_PER_LINE = 16
 DIAGNOSTIC_MESSAGE_RE = re.compile(r"(diagnosticMessage=)0x([0-9A-Fa-f]+)")
 FILTER_LINE_RE = re.compile(r"^(?P<indent> *)filter=")
+ATTRIBUTES_LINE_RE = re.compile(r"^(?P<indent> *)attributes=AttributeSelection:$")
 
 FILTER_COMPARISON_OPS = {
     "equalityMatch": "=",
@@ -127,6 +128,19 @@ def render_filter(filt) -> str:
     return f"(unsupported-filter-type:{name})"
 
 
+def _skip_block(lines: list, start: int, indent_len: int) -> int:
+    """Return the index of the next line that is not part of the
+    (blank-line-separated) block nested under a field at indent_len."""
+    i = start
+    while i < len(lines):
+        rest_indent = len(lines[i]) - len(lines[i].lstrip(" "))
+        if lines[i].strip() == "" or rest_indent > indent_len:
+            i += 1
+            continue
+        break
+    return i
+
+
 def render_search_filter_as_string(pretty: str, filter_str: str) -> str:
     """Replace the (potentially deeply nested, multi-line) default
     prettyPrint() rendering of the 'filter=' field with a single-line
@@ -143,13 +157,27 @@ def render_search_filter_as_string(pretty: str, filter_str: str) -> str:
 
         indent = match.group("indent")
         out.append(f"{indent}filter={filter_str}")
-        i += 1
-        while i < len(lines):
-            rest_indent = len(lines[i]) - len(lines[i].lstrip(" "))
-            if lines[i].strip() == "" or rest_indent > len(indent):
-                i += 1
-                continue
-            break
+        i = _skip_block(lines, i + 1, len(indent))
+    return "\n".join(out)
+
+
+def render_attributes_as_list(pretty: str, attr_names: list) -> str:
+    """pyasn1's default prettyPrint() joins the requested attributes into
+    a single space-separated line. List them one per line instead."""
+    lines = pretty.split("\n")
+    out = []
+    i = 0
+    while i < len(lines):
+        match = ATTRIBUTES_LINE_RE.match(lines[i])
+        if not match:
+            out.append(lines[i])
+            i += 1
+            continue
+
+        indent = match.group("indent")
+        out.append(lines[i])
+        i = _skip_block(lines, i + 1, len(indent))
+        out.extend(f"{indent} {name}" for name in attr_names)
     return "\n".join(out)
 
 
@@ -168,9 +196,15 @@ def decode_ldap_messages(data: bytes) -> dict:
         pretty = render_diagnostic_message_as_string(msg.prettyPrint())
         protocol_op = msg["protocolOp"]
         if protocol_op.getName() == "searchRequest":
+            search_request = protocol_op["searchRequest"]
             try:
-                filter_str = render_filter(protocol_op["searchRequest"]["filter"])
+                filter_str = render_filter(search_request["filter"])
                 pretty = render_search_filter_as_string(pretty, filter_str)
+            except Exception:
+                pass
+            try:
+                attr_names = [str(attr) for attr in search_request["attributes"]]
+                pretty = render_attributes_as_list(pretty, attr_names)
             except Exception:
                 pass
         messages.append(pretty)
