@@ -11,16 +11,20 @@ MAX_BYTES_PER_LINE = 16
 
 
 def extract_hex_bytes(text: str) -> bytes:
-    """Pull raw bytes out of a HexDumpEncoder-style dump, ignoring the
-    leading offset column and the trailing ASCII sidebar on each line."""
+    """Pull raw bytes out of a HexDumpEncoder-style dump, ignoring any
+    leading log prefix (timestamp, level, thread name, ...) and offset
+    column, plus the trailing ASCII sidebar on each line."""
     out = bytearray()
     for raw_line in text.splitlines():
         tokens = raw_line.split()
         if not tokens:
             continue
-        if OFFSET_RE.match(tokens[0]):
-            tokens = tokens[1:]
-        for tok in tokens[:MAX_BYTES_PER_LINE]:
+        start = 0
+        for i, tok in enumerate(tokens):
+            if OFFSET_RE.match(tok) and i + 1 < len(tokens) and BYTE_RE.match(tokens[i + 1]):
+                start = i + 1
+                break
+        for tok in tokens[start : start + MAX_BYTES_PER_LINE]:
             if BYTE_RE.match(tok):
                 out.append(int(tok, 16))
             else:
