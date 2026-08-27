@@ -1,0 +1,107 @@
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 2rem 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+main {
+  width: 100%;
+  max-width: 860px;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.lead {
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: 0;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.85rem;
+  padding: 0.75rem;
+  resize: vertical;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.75rem 0;
+}
+
+button {
+  font-size: 1rem;
+  padding: 0.5rem 1.25rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+#status {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.error {
+  background: #fdecea;
+  color: #611a15;
+  border: 1px solid #f5c2c0;
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  white-space: pre-wrap;
+}
+
+.warning {
+  background: #fff8e1;
+  color: #5c4a03;
+  border: 1px solid #f0dca0;
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  white-space: pre-wrap;
+}
+
+.message {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.message h2 {
+  font-size: 0.95rem;
+  margin: 0;
+  padding: 0.5rem 1rem;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+}
+
+.message pre {
+  margin: 0;
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.85rem;
+  white-space: pre;
+}
+
+.summary {
+  font-size: 0.85rem;
+  color: #666;
+}
