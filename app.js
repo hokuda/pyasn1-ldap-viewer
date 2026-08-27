@@ -2,6 +2,7 @@
 
 const inputEl = document.getElementById("input");
 const decodeBtn = document.getElementById("decodeBtn");
+const clearBtn = document.getElementById("clearBtn");
 const statusEl = document.getElementById("status");
 const errorEl = document.getElementById("error");
 const outputEl = document.getElementById("output");
@@ -55,6 +56,13 @@ function renderResult(result) {
   outputEl.appendChild(summary);
 }
 
+function handleClearClick() {
+  inputEl.value = "";
+  outputEl.innerHTML = "";
+  clearError();
+  inputEl.focus();
+}
+
 async function handleDecodeClick() {
   const text = inputEl.value;
   if (!text.trim()) {
@@ -99,4 +107,5 @@ async function bootstrap() {
 }
 
 decodeBtn.addEventListener("click", handleDecodeClick);
+clearBtn.addEventListener("click", handleClearClick);
 bootstrap();
